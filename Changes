@@ -1,0 +1,6 @@
+0.03
+	CHANGED: removed POD::Spelling and replaced with Perl::Critic policy
+	CHANGED: pass new policies
+
+0.02
+	FIXED: removed dependency to Data::TreeDumper in Build.pl

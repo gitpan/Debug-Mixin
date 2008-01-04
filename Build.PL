@@ -46,7 +46,7 @@ else
 }
 
 my $code = <<'EOC'
-use Data::TreeDumper ;
+#~ use Data::TreeDumper ;
 #~ print DumpTree \@_, 'args:' ;
 
 sub GetVersionAndRevisionFrom
@@ -206,6 +206,8 @@ my $build = $class->new
 		'Sub::Install'     => 0,
 		'Data::TreeDumper' => 0,
 		'Tie::Hash::Indexed' => 0,
+		'List::MoreUtils' => 0,
+		'FATA' => 0,
 		
 		'Test::Block' => 0,
 		'Test::Dependencies' => 0,

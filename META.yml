@@ -1,6 +1,6 @@
 ---
 name: Debug-Mixin
-version: 0.01
+version: 0.3
 author:
   - 'Khemir Nadim ibn Hamouda. <nadim@khemir.net>'
 abstract: Make your applications and modules easier to debug
@@ -10,6 +10,8 @@ resources:
 requires:
   Data::Compare: 0
   Data::TreeDumper: 0
+  FATA: 0
+  List::MoreUtils: 0
   Readonly: 0
   Sub::Install: 0
   Test::Block: 0
@@ -24,11 +26,12 @@ requires:
   Test::Spelling: 0
   Test::Strict: 0
   Test::Warn: 0
+  Tie::Hash::Indexed: 0
 provides:
   Debug::Mixin:
     file: lib/Debug/Mixin.pm
-    version: 0.01
-generated_by: Module::Build version 0.2805
+    version: 0.3
+generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2

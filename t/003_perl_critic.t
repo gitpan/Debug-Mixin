@@ -10,6 +10,8 @@ use Term::ANSIColor qw(:constants);
 use Test::Perl::Critic 
 	-severity => 1,
 	# %p for rule name
+#	-format =>  "[%s] %m  at " .  BOLD . BLUE . "'%f:%l:%c'" . RESET . " rule " .  BOLD . RED . "%p %e\n" . RESET
+#				. "\t%r",
 	-format =>  "%m [%s] at " . BLACK . ON_WHITE . "'%f:%l:%c'" . RESET . "%e\n"
 				. "\t%r\n",
 	-exclude =>
@@ -22,7 +24,7 @@ use Test::Perl::Critic
 		'ControlStructures::ProhibitUnlessBlocks',
 		'CodeLayout::RequireTidyCode',
 		'CodeLayout::ProhibitHardTabs',
-		
+		'CodeLayout::ProhibitTrailingWhitespace',
 		], 
 		
 	-profile => 't/perlcriticrc' ;

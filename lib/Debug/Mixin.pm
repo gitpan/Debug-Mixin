@@ -9,7 +9,7 @@ BEGIN
 {
 use vars qw ($VERSION @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION     = 0.01;
+$VERSION     = 0.3;
 @EXPORT_OK   = qw (IsDebuggerEnabled CheckBreakpoint);
 %EXPORT_TAGS = ();
 }
@@ -25,12 +25,13 @@ use Readonly ;
 Readonly my $EMPTY_STRING => q{} ;
 
 use Tie::Hash::Indexed ;
+use List::MoreUtils qw(any) ;
 
 #-------------------------------------------------------------------------------
 
 =head1 NAME
 
- Debug::App - Make your applications and modules easier to debug
+ Debug::Mixin - Make your applications and modules easier to debug
 
 =head1 SYNOPSIS
 
@@ -209,11 +210,11 @@ script doesn't have to be aware of modules debugging facilities, only modules us
 
 if(*DB::DB{CODE})
 	{
-	print "Debug::Mixin support available, type 'dm_help' for help, or man Debug::Mixin for more help.\n\n" ;
+	Output("Debug::Mixin support available, type 'dm_help' for help, or man Debug::Mixin for more help.\n\n") ;
 	}
 else
 	{
-	print "Debug::Mixin banner when debugger is not loaded\n" ;
+	Output("Debug::Mixin banner when debugger is not loaded\n") ;
 	}
 	
 #-------------------------------------------------------------------------------
@@ -233,13 +234,13 @@ Called for you by Perl
 
 =cut
 
+my ($module_name, $data, @more_data) = @_ ;
+
 my ($package, $file_name, $line) = caller() ;
-print "Debug::Mixin used at '$package, $file_name, $line'\n" ;
+Output("Debug::Mixin used at '$package, $file_name, $line'\n") ;
 
 #~ use Data::TreeDumper ;
 #~ print DumpTree \@_ ;
-
-my ($module_name, $data, @more_data) = @_ ;
 
 if(defined $data)
 	{
@@ -316,7 +317,7 @@ for($key)
 		{
 		if(*DB::DB{CODE})
 			{
-			print "Debug::Mixin loaded for '$value'\n" ;
+			Output("Debug::Mixin loaded for '$value'\n") ;
 			}
 		next ;
 		} ;
@@ -327,15 +328,15 @@ for($key)
 		
 		for my $file (@{$files})
 			{
-			print "Loading '$file'\n" ;
+			Output("Loading '$file'\n") ;
 			}
 		next ;
 		} ;
 		
 	/DEBUGGER_SUBS/mx and do
 		{
-		croak "Debug::Mixin: DEBUGGER_SUBS must be a list!\n" unless 'ARRAY' eq ref $value ;
-		croak "Debug::Mixin: no subroutine defined in DEBUGGER_SUBS!\n" unless @{$value} > 0 ;
+		croak "Debug::Mixin: DEBUGGER_SUBS must be a list!\n" unless('ARRAY' eq ref $value) ;
+		croak "Debug::Mixin: no subroutine defined in DEBUGGER_SUBS!\n" if( @{$value} <= 0) ;
 		
 		
 		for my $debugger_sub (@{$value})
@@ -373,7 +374,7 @@ for($key)
 						});
 					}
 					
-				print "Debug::Mixin registrating debugger sub '${package}::$debugger_sub->{NAME}'\n" ;
+				Output("Debug::Mixin registrating debugger sub '${package}::$debugger_sub->{NAME}'\n") ;
 				}
 			}
 			
@@ -423,7 +424,7 @@ return($debug_enabled) ;
 
 #-------------------------------------------------------------------------------
 
-sub AddBreakpoint
+sub AddBreakpoint ## no critic (Subroutines::RequireArgUnpacking)
 {
 
 =head2 AddBreakpoint
@@ -545,61 +546,7 @@ croak 'AddBreakpoint: odd number of arguments!' if @_ % 2 ;
 
 my (%breakpoint) = @_ ;
 
-my $valid_keys = join('$|^', qw(NAME FILTERS ACTIONS DEBUGGER_SUBS LOCAL_STORAGE ALWAYS_USE_DEBUGGER ACTIVE)) ; ## no critic
-
-for my $key (keys %breakpoint)
-	{
-	croak "AddBreakpoint: Unrecognized argument '$key'!\n" unless $key =~ /^$valid_keys$/mox ;
-	}
-
-croak "AddBreakpoint: Missing NAME!\n" unless exists $breakpoint{NAME} && defined $breakpoint{NAME} ;
-croak "AddBreakpoint: NAME must be a scalar!\n" unless $EMPTY_STRING eq ref $breakpoint{NAME} ;
-
-if(exists $breakpoint{ACTIONS})
-	{
-	croak "AddBreakpoint: ACTIONS must be a list of subs!\n" unless 'ARRAY' eq ref $breakpoint{ACTIONS} ;
-	croak "AddBreakpoint: no actions defined in ACTIONS!\n" unless  @{$breakpoint{ACTIONS}} > 0 ;
-	croak "AddBreakpoint: actions is not a sub reference!\n"  if grep {'CODE' ne ref $_} @{$breakpoint{ACTIONS}} ;
-	}
-
-if(exists  $breakpoint{FILTERS})
-	{
-	croak "AddBreakpoint: FILTERS must be an array!\n" unless 'ARRAY' eq ref $breakpoint{FILTERS} ;
-	croak "AddBreakpoint: no filters defined in FILTERS!\n" unless @{$breakpoint{FILTERS}} > 0 ;
-	croak "AddBreakpoint: filter is not a code ref!\n"  if grep {'CODE' ne ref $_} @{$breakpoint{FILTERS}} ;
-	}
-	
-unless
-	(
-	exists $breakpoint{ACTIONS} 
-	||
-	(exists $breakpoint{FILTERS} && exists $breakpoint{ALWAYS_USE_DEBUGGER} && $breakpoint{ALWAYS_USE_DEBUGGER} == 1)
-	)
-	{
-	croak "AddBreakpoint: Missing ACTIONS or (FILTERS + ALWAYS_USE_DEBUGGER)!\n" 
-	}
-
-if(exists $breakpoint{DEBUGGER_SUBS})
-	{
-	croak "AddBreakpoint: DEBUGGER_SUBS must be a list!\n" unless 'ARRAY' eq ref $breakpoint{DEBUGGER_SUBS} ;
-	croak "AddBreakpoint: no subroutine defined in DEBUGGER_SUBS!\n" unless @{$breakpoint{DEBUGGER_SUBS}} > 0 ;
-	
-	for my $debugger_sub (@{$breakpoint{DEBUGGER_SUBS}})
-		{
-		croak "AddBreakpoint: local subroutine must be a hash!\n" unless 'HASH' eq ref $debugger_sub ;
-		croak "AddBreakpoint: invalid local subroutine definition!\n" unless  4 == keys %{$debugger_sub} ;
-		
-		my $valid_function_keys = join('$|^', qw(NAME DESCRIPTION HELP SUB)) ; ## no critic
-		
-		for my $key (keys %{$debugger_sub})
-			{
-			croak "AddBreakpoint: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_function_keys$/mox ;
-			}
-		}
-	}
-	
-croak "AddBreakpoint: ALWAYS_USE_DEBUGGER must be a scalar!\n" if exists $breakpoint{ALWAYS_USE_DEBUGGER}&& $EMPTY_STRING ne ref $breakpoint{ALWAYS_USE_DEBUGGER} ;
-croak "AddBreakpoint: ACTIVE must be a scalar!\n" if exists $breakpoint{ACTIVE}&& $EMPTY_STRING ne  ref $breakpoint{ACTIVE} ;
+CheckBreakPointDefinitions(\%breakpoint) ;
 
 my ($package, $file_name, $line) = caller() ;
 
@@ -621,6 +568,78 @@ else
 push @{$breakpoints{$breakpoint{NAME}}{AT}}, {FILE => $file_name, LINE => $line, PACKAGE => $package} ;
 
 return(1) ;
+}
+
+#----------------------------------------------------------------------
+
+sub CheckBreakPointDefinitions
+{## no critic (ProhibitExcessComplexity)
+
+=head2 CheckBreakPointDefinitions
+
+Checks the validity of the user supplied breakpoint definitions. Croaks on error.
+
+=cut
+
+my ($breakpoint) = @_ ;
+
+my $valid_keys = join('$|^', qw(NAME FILTERS ACTIONS DEBUGGER_SUBS LOCAL_STORAGE ALWAYS_USE_DEBUGGER ACTIVE)) ; ## no critic
+
+for my $key (keys %{$breakpoint})
+	{
+	croak "AddBreakpoint: Unrecognized argument '$key'!\n" unless $key =~ /^$valid_keys$/mox ;
+	}
+
+croak "AddBreakpoint: Missing NAME!\n" unless exists $breakpoint->{NAME} && defined $breakpoint->{NAME} ;
+croak "AddBreakpoint: NAME must be a scalar!\n" unless $EMPTY_STRING eq ref $breakpoint->{NAME} ;
+
+if(exists $breakpoint->{ACTIONS})
+	{
+	croak "AddBreakpoint: ACTIONS must be a list of subs!\n" unless 'ARRAY' eq ref $breakpoint->{ACTIONS} ;
+	croak "AddBreakpoint: no actions defined in ACTIONS!\n" if  @{$breakpoint->{ACTIONS}} <= 0 ;
+	croak "AddBreakpoint: actions is not a sub reference!\n"  if any {'CODE' ne ref $_} @{$breakpoint->{ACTIONS}} ;
+	}
+
+if(exists  $breakpoint->{FILTERS})
+	{
+	croak "AddBreakpoint: FILTERS must be an array!\n" unless 'ARRAY' eq ref $breakpoint->{FILTERS} ;
+	croak "AddBreakpoint: no filters defined in FILTERS!\n" if @{$breakpoint->{FILTERS}} <= 0 ;
+	croak "AddBreakpoint: filter is not a code ref!\n"  if any {'CODE' ne ref $_} @{$breakpoint->{FILTERS}} ;
+	}
+	
+unless
+	(
+	exists $breakpoint->{ACTIONS} 
+	||
+	(exists $breakpoint->{FILTERS} && exists $breakpoint->{ALWAYS_USE_DEBUGGER} && $breakpoint->{ALWAYS_USE_DEBUGGER} == 1)
+	)
+	{
+	croak "AddBreakpoint: Missing ACTIONS or (FILTERS + ALWAYS_USE_DEBUGGER)!\n" 
+	}
+
+if(exists $breakpoint->{DEBUGGER_SUBS})
+	{
+	croak "AddBreakpoint: DEBUGGER_SUBS must be a list!\n" unless 'ARRAY' eq ref $breakpoint->{DEBUGGER_SUBS} ;
+	croak "AddBreakpoint: no subroutine defined in DEBUGGER_SUBS!\n" if @{$breakpoint->{DEBUGGER_SUBS}} <= 0 ;
+	
+	for my $debugger_sub (@{$breakpoint->{DEBUGGER_SUBS}})
+		{
+		croak "AddBreakpoint: local subroutine must be a hash!\n" unless 'HASH' eq ref $debugger_sub ;
+		croak "AddBreakpoint: invalid local subroutine definition!\n" unless  4 == keys %{$debugger_sub} ;
+		
+		my $valid_function_keys = join('$|^', qw(NAME DESCRIPTION HELP SUB)) ; ## no critic
+		
+		for my $key (keys %{$debugger_sub})
+			{
+			croak "AddBreakpoint: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_function_keys$/mox ;
+			}
+		}
+	}
+	
+croak "AddBreakpoint: ALWAYS_USE_DEBUGGER must be a scalar!\n" if exists $breakpoint->{ALWAYS_USE_DEBUGGER}&& $EMPTY_STRING ne ref $breakpoint->{ALWAYS_USE_DEBUGGER} ;
+croak "AddBreakpoint: ACTIVE must be a scalar!\n" if exists $breakpoint->{ACTIVE}&& $EMPTY_STRING ne  ref $breakpoint->{ACTIVE} ;
+
+return ;
 }
 
 #----------------------------------------------------------------------
@@ -711,7 +730,7 @@ return(1) ;
 
 sub ListDebuggerSubs
 {
-	
+
 =head2 ListDebuggerSubs
 
 List all the debugger subs registered by modules loading Debug::Mixin on STDOUT.
@@ -727,7 +746,7 @@ unless(@packages)
 	
 for my $package(@packages)
 	{
-	print(DumpTree($debugger_subs{$package}, "$package:")) ;
+	Output(DumpTree($debugger_subs{$package}, "$package:")) ;
 	}
 
 return(1) ;
@@ -737,7 +756,7 @@ return(1) ;
 
 sub ListBreakpoints
 {
-	
+
 =head2 ListBreakpoints
 
 List, on STDOUT, all the breakpoints matching the name regex passed as argument.
@@ -745,13 +764,13 @@ List, on STDOUT, all the breakpoints matching the name regex passed as argument.
 =cut
 
 my ($breakpoint_regex) = @_ ;
-$breakpoint_regex = qr/./ unless defined $breakpoint_regex ;
+$breakpoint_regex = qr/./xm unless defined $breakpoint_regex ;
 
 for my $breakpoint_name (sort keys %breakpoints)
 	{
 	if($breakpoint_name =~ $breakpoint_regex)
 		{
-		print(DumpTree($breakpoints{$breakpoint_name}, "$breakpoint_name:")) ;
+		Output(DumpTree($breakpoints{$breakpoint_name}, "$breakpoint_name:")) ;
 		}
 	}
 
@@ -762,7 +781,7 @@ return(1) ;
 
 sub GetBreakpoints
 {
-	
+
 =head2 GetBreakpoints
 
 Returns a reference to all the breakpoints. Elements are returned in the insertion order.
@@ -812,7 +831,7 @@ return($activated_breakpoints) ;
 
 sub DeactivateBreakpoints
 {
-	
+
 =head2 DeactivateBreakpoints
 
 Deactivate all the breakpoints matching the name regex passed as argument.
@@ -844,7 +863,7 @@ return($deactivated_breakpoints) ;
 
 sub ActivateAlwaysUseDebugger
 {
-	
+
 =head2 ActivateAlwaysUseDebugger
 
 Sets all breakpoints matching the name regex passed as argument to always jumps to the perl debugger.
@@ -874,7 +893,7 @@ return($always_use_debugger_breakpoints) ;
 
 sub DeactivateAlwaysUseDebugger
 {
-	
+
 =head2 DeactivateAlwaysUseDebugger
 
 Sets all breakpoints matching the name regex passed as argument, to never jumps to the perl debugger.
@@ -902,7 +921,7 @@ return($never_use_debugger_breakpoints) ;
 
 #----------------------------------------------------------------------
 
-sub CheckBreakpoints
+sub CheckBreakpoints ## no critic (Subroutines::RequireArgUnpacking)
 {
 
 =head2 CheckBreakpoints
@@ -1071,7 +1090,7 @@ do
 	{
 	my $header = "Debug::Mixin: Available subs at breakpoint '$breakpoint->{NAME}' ($breakpoint->{MATCHED}):" ;
 	my $separator = q{-} x length $header ;
-	print "$separator\n$header\n$separator\n" ;
+	Output("$separator\n$header\n$separator\n") ;
 
 	my $index = 0 ;
 
@@ -1083,14 +1102,14 @@ do
 
 	for my $sub (@{$breakpoint->{DEBUGGER_SUBS}})
 		{
-		printf "   #%2d %${max_length}s => $sub->{DESCRIPTION}\n", $index, $sub->{NAME} ;
+		Output(sprintf("   #%2d %${max_length}s => $sub->{DESCRIPTION}\n", $index, $sub->{NAME})) ;
 		$index++ ;
 		}
 		
-	print "\n'#' to run sub, 'd #' for a long descriptions of the sub or 'c' to continue.\n" ;
-	print q{>} ;
+	Output("\n'#' to run sub, 'd #' for a long descriptions of the sub or 'c' to continue.\n") ;
+	Output(q{>}) ;
 	
-	$choice = <STDIN> ;
+	$choice = <> ;
 	chomp($choice) ;
 	
 	for($choice)
@@ -1123,7 +1142,7 @@ do
 				my $sub_header = "$sub->{NAME}:" ;
 				my $sub_separator = q{-} x length($sub_header) ;
 				
-				print "$sub_header\n$sub_separator\n$sub->{HELP}\n\n" ;
+				Output("$sub_header\n$sub_separator\n$sub->{HELP}\n\n") ;
 				}
 				
 			last ;
@@ -1146,7 +1165,7 @@ Displays the commands made available by B<Debug::Mixin> in the debugger.
 
 =cut
 
-print <<'EOC' ;
+Output(<<'EOC') ;
 	dm_subs                     list and run debugging subs
 	
 	dm_load @files              load breakpoints files
@@ -1181,7 +1200,7 @@ do
 	{
 	my $header = 'Debug::Mixin: Available subs:' ;
 	my $separator = q{-} x length $header ;
-	print "$separator\n$header\n$separator\n" ;
+	Output("$separator\n$header\n$separator\n") ;
 	
 	my $index = 0 ;
 	my $max_length = 0 ;
@@ -1189,23 +1208,23 @@ do
 	
 	for my $package (keys %debugger_subs)
 		{
-		print "$package:\n" ;
+		Output("$package:\n") ;
 		
 		for my $sub (values %{$debugger_subs{$package}})
 			{
 			push @subs, $sub ;
 			
-			printf "   #%2d $sub->{NAME} => $sub->{DESCRIPTION}\n", $index ;
+			Output(sprintf("   #%2d $sub->{NAME} => $sub->{DESCRIPTION}\n", $index)) ;
 			$index++ ;
 			}
 			
-		print "\n" ;
+		Output("\n") ;
 		}
 		
-	print "\n'#' to run sub, 'd #' for a long descriptions of the sub or 'c' to continue.\n" ;
-	print q{>} ;
+	Output("\n'#' to run sub, 'd #' for a long descriptions of the sub or 'c' to continue.\n") ;
+	Output(q{>}) ;
 	
-	$choice = <STDIN> ;
+	$choice = <> ;
 	chomp($choice) ;
 	
 	for($choice)
@@ -1233,7 +1252,7 @@ do
 				my $sub_header = "$sub->{NAME}:" ;
 				my $sub_separator = q{-} x length($sub_header) ;
 				
-				print "$sub_header\n$sub_separator\n$sub->{HELP}\n\n" ;
+				Output("$sub_header\n$sub_separator\n$sub->{HELP}\n\n") ;
 				}
 				
 			last ;
@@ -1248,6 +1267,21 @@ return(1) ;
 
 #-------------------------------------------------------------------------------
 
+sub Output ## no critic (Subroutines::RequireArgUnpacking)
+{
+
+=head2 Output
+
+Prints the passed arguments 
+
+=cut
+
+print(@_) or die "Can't output!\n" ;
+
+return ;
+}
+
+#-------------------------------------------------------------------------------
 1 ;
 
 =head1 TO DO
@@ -1273,7 +1307,7 @@ it and/or modify it under the same terms as Perl itself.
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc Debug::App
+    perldoc Debug::Mixin
 
 You can also look for information at:
 
@@ -1281,18 +1315,18 @@ You can also look for information at:
 
 =item * AnnoCPAN: Annotated CPAN documentation
 
-L<http://annocpan.org/dist/Debug-App>
+L<http://annocpan.org/dist/Debug-Mixin>
 
 =item * RT: CPAN's request tracker
 
-Please report any bugs or feature requests to  L <bug-my $storage_ref = debug-app@rt.cpan.org>.
+Please report any bugs or feature requests to  L <bug-my $storage_ref = debug-mixin@rt.cpan.org>.
 
 We will be notified, and then you'll automatically be notified of progress on
 your bug as we make changes.
 
 =item * Search CPAN
 
-L<http://search.cpan.org/dist/Debug-App>
+L<http://search.cpan.org/dist/Debug-Mixin>
 
 =back
 
