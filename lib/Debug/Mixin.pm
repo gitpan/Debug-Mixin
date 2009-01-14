@@ -9,7 +9,7 @@ BEGIN
 {
 use vars qw ($VERSION @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION     = 0.3;
+$VERSION     = '0.4' ;
 @EXPORT_OK   = qw (IsDebuggerEnabled CheckBreakpoint);
 %EXPORT_TAGS = ();
 }
@@ -19,6 +19,7 @@ $VERSION     = 0.3;
 use Carp qw(croak carp confess cluck);
 use Data::TreeDumper ;
 
+use Sub::Install;
 use English qw( -no_match_vars ) ;
 
 use Readonly ;
@@ -256,7 +257,7 @@ if(defined $data)
 		unshift @more_data, $data ;
 		for(@more_data)
 			{
-			SetupElement($package, $file_name, $line, split(/=/xm, $_)) ;
+			SetupElement($package, $file_name, $line, split(/=/sxm, $_)) ;
 			}
 		}
 	}
@@ -267,7 +268,7 @@ if(defined $data)
 #except
 if(*DB::DB{CODE})
 	{
-	use Sub::Install;
+	
 	
 	for my $sub
 		(
@@ -313,7 +314,7 @@ my ($package, $file_name, $line, $key, $value) = @_ ;
 
 for($key)
 	{
-	/BANNER/mix and do
+	/BANNER/smix and do
 		{
 		if(*DB::DB{CODE})
 			{
@@ -322,7 +323,7 @@ for($key)
 		next ;
 		} ;
 		
-	/LoadBreakpointsFiles/mx and do
+	/LoadBreakpointsFiles/smx and do
 		{
 		my $files = 'ARRAY' eq ref $value ? $value : [$value] ;
 		
@@ -333,29 +334,29 @@ for($key)
 		next ;
 		} ;
 		
-	/DEBUGGER_SUBS/mx and do
+	/DEBUGGER_SUBS/smx and do
 		{
 		croak "Debug::Mixin: DEBUGGER_SUBS must be a list!\n" unless('ARRAY' eq ref $value) ;
 		croak "Debug::Mixin: no subroutine defined in DEBUGGER_SUBS!\n" if( @{$value} <= 0) ;
 		
+		Readonly my $EXPECTED_NUMBER_OF_DEBUGGER_SUB_FIELDS => 5 ;
 		
 		for my $debugger_sub (@{$value})
 			{
 			croak "Debug::Mixin: local subroutine must be a hash!\n" unless 'HASH' eq ref $debugger_sub ;
-			croak "Debug::Mixin: invalid local subroutine definition!\n" unless 5 == keys %{$debugger_sub} ;
+			croak "Debug::Mixin: invalid local subroutine definition!\n" 
+				unless $EXPECTED_NUMBER_OF_DEBUGGER_SUB_FIELDS	== keys %{$debugger_sub} ;
 			
 			my $valid_keys = join('$|^', qw(NAME ALIASES DESCRIPTION HELP SUB)) ; ## no critic
 			
 			for my $key (keys %{$debugger_sub})
 				{
-				croak "Debug::Mixin: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_keys$/mxo ;
+				croak "Debug::Mixin: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_keys$/smxo ;
 				}
 				
 			if(*DB::DB{CODE})
 				{
 				$debugger_subs{$package}{$debugger_sub->{NAME}} = $debugger_sub ;
-				
-				use Sub::Install;
 				
 				Sub::Install::reinstall_sub
 					({
@@ -587,7 +588,7 @@ my $valid_keys = join('$|^', qw(NAME FILTERS ACTIONS DEBUGGER_SUBS LOCAL_STORAGE
 
 for my $key (keys %{$breakpoint})
 	{
-	croak "AddBreakpoint: Unrecognized argument '$key'!\n" unless $key =~ /^$valid_keys$/mox ;
+	croak "AddBreakpoint: Unrecognized argument '$key'!\n" unless $key =~ /^$valid_keys$/smox ;
 	}
 
 croak "AddBreakpoint: Missing NAME!\n" unless exists $breakpoint->{NAME} && defined $breakpoint->{NAME} ;
@@ -622,16 +623,19 @@ if(exists $breakpoint->{DEBUGGER_SUBS})
 	croak "AddBreakpoint: DEBUGGER_SUBS must be a list!\n" unless 'ARRAY' eq ref $breakpoint->{DEBUGGER_SUBS} ;
 	croak "AddBreakpoint: no subroutine defined in DEBUGGER_SUBS!\n" if @{$breakpoint->{DEBUGGER_SUBS}} <= 0 ;
 	
+	Readonly my $EXPECTED_NUMBER_OF_DEBUGGER_SUB_FIELDS => 4 ;
+	
 	for my $debugger_sub (@{$breakpoint->{DEBUGGER_SUBS}})
 		{
 		croak "AddBreakpoint: local subroutine must be a hash!\n" unless 'HASH' eq ref $debugger_sub ;
-		croak "AddBreakpoint: invalid local subroutine definition!\n" unless  4 == keys %{$debugger_sub} ;
+		croak "AddBreakpoint: invalid local subroutine definition!\n" 
+			unless  $EXPECTED_NUMBER_OF_DEBUGGER_SUB_FIELDS == keys %{$debugger_sub} ;
 		
 		my $valid_function_keys = join('$|^', qw(NAME DESCRIPTION HELP SUB)) ; ## no critic
 		
 		for my $key (keys %{$debugger_sub})
 			{
-			croak "AddBreakpoint: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_function_keys$/mox ;
+			croak "AddBreakpoint: Unrecognized local subroutine argument '$key'!\n" unless $key =~ /^$valid_function_keys$/smox ;
 			}
 		}
 	}
@@ -764,7 +768,7 @@ List, on STDOUT, all the breakpoints matching the name regex passed as argument.
 =cut
 
 my ($breakpoint_regex) = @_ ;
-$breakpoint_regex = qr/./xm unless defined $breakpoint_regex ;
+$breakpoint_regex = qr/./sxm unless defined $breakpoint_regex ;
 
 for my $breakpoint_name (sort keys %breakpoints)
 	{
@@ -1114,7 +1118,7 @@ do
 	
 	for($choice)
 		{
-		/^[0-9]+$/mx and do
+		/^[0-9]+$/smx and do
 			{
 			if($choice < @{$breakpoint->{DEBUGGER_SUBS}})
 				{
@@ -1131,7 +1135,7 @@ do
 			last ;
 			} ;
 			
-		/^d ([0-9]+)$/mx and do
+		/^d ([0-9]+)$/smx and do
 			{
 			my $sub_index = $1 ; ## no critic
 			
@@ -1229,7 +1233,7 @@ do
 	
 	for($choice)
 		{
-		/^[0-9]+$/mx and do
+		/^[0-9]+$/smx and do
 			{
 			if($choice < @subs)
 				{
@@ -1241,7 +1245,7 @@ do
 			last ;
 			} ;
 			
-		/^d ([0-9]+)$/mx and do
+		/^d ([0-9]+)$/smx and do
 			{
 			my $sub_index = $1 ; ## no critic
 			

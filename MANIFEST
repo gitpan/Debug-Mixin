@@ -10,14 +10,7 @@ META.yml
 
 lib/Debug/Mixin.pm
 
-t/000_dependencies.t
-t/000_distribution.t
-t/000_fixme.t
-t/000_kwalitee.t
 t/001_1_load.t
-t/002_1_pod.t
-t/002_2_pod_coverage.t
-t/003_perl_critic.t
 t/004_1_banner.t
 t/004_2_banner.t
 t/005_add_remove_breakpoint.t
@@ -31,5 +24,13 @@ t/016_-M.t
 t/020_help.t
 t/021_query.t
 t/022_output.t
-t/perlcriticrc
 t/test_template
+
+xt/author/000_dependencies.t
+xt/author/000_distribution.t
+xt/author/000_fixme.t
+xt/author/000_kwalitee.t
+xt/author/002_1_pod.t
+xt/author/002_2_pod_coverage.t
+xt/author/003_perl_critic.t
+xt/author/perlcriticrc
